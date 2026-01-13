@@ -88,25 +88,52 @@ def run(config_path: Optional[str] = None) -> Dict[str, Any]:
     if not cfg.stocks:
         raise ValueError("No stocks configured. Please add at least one stock code in config.yaml.")
 
-    start_trade_date, end_trade_date = resolve_trade_window(cfg)
-
     rows: List[Dict[str, Any]] = []
     for s in cfg.stocks:
         code = str(s.code).zfill(6)
         name = get_stock_name(code)
+        start_trade_date: Optional[str] = None
+        end_trade_date: Optional[str] = None
         try:
+            # Derive per-stock trading window to handle newly listed stocks properly
+            start_trade_date, end_trade_date = derive_trade_window_from_prices(code, cfg.start_date, cfg.end_date)
             res = compute_interval_total_return(code, start_trade_date, end_trade_date)
+
+            # Recompute additional shares and description explicitly to ensure presence in output
+            try:
+                from .ak_client import sum_additional_shares_in_interval
+                add_shares, add_count, add_desc = sum_additional_shares_in_interval(code, start_trade_date, end_trade_date)
+            except Exception:
+                add_shares, add_count, add_desc = 0.0, 0, ""
+
+            # Recompute total_return using explicit additional value to ensure consistency
+            total_return = None
+            try:
+                end_close_val = res.end_close
+                start_close_val = res.start_close
+                div_sum_val = res.dividend_sum_per_share
+                add_value_per_share = end_close_val * add_shares
+                total_return = (end_close_val + div_sum_val + add_value_per_share - start_close_val) / start_close_val
+            except Exception:
+                total_return = res.total_return
+
             # Compute annualized return based on calendar days
             try:
                 days = (datetime.strptime(end_trade_date, "%Y-%m-%d") - datetime.strptime(start_trade_date, "%Y-%m-%d")).days
                 annualized = None
-                if days and days > 0:
-                    annualized = (1.0 + res.total_return) ** (365.0 / days) - 1.0
+                if days and days > 0 and total_return is not None:
+                    annualized = (1.0 + total_return) ** (365.0 / days) - 1.0
             except Exception:
                 annualized = None
+
             row = res.as_dict()
             row["name"] = name
             row["code"] = code
+            row["additional_shares_per_share"] = add_shares
+            row["additional_event_count"] = add_count
+            row["additional_value_per_share"] = res.end_close * add_shares
+            row["bonus_allot_desc"] = add_desc
+            row["total_return"] = total_return
             row["annualized_return"] = annualized
             rows.append(row)
         except Exception as e:
