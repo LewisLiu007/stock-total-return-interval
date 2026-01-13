@@ -1,13 +1,13 @@
 # Configuration for Stock Interval Total Return (Unadjusted + Cash Dividends, No Reinvestment)
 # Dates in YYYY-MM-DD. If end_date is omitted, program will use previous trading day.
 stocks:
-  - code: 600519   # 贵州茅台
-  - code: 000858   # 五粮液
-  - code: 000568   # 泸州老窖
-  - code: 002304   # 洋河股份
-  - code: 000596
-  - code: 600809
-  - code: 600779
-  - code: 603369
+  - code: "600519"   # 贵州茅台
+  - code: "000858"   # 五粮液
+  - code: "000568"   # 泸州老窖
+  - code: "002304"   # 洋河股份
+  - code: "000596"
+  - code: "600809"
+  - code: "600779"
+  - code: "603369"
 start_date: 2019-01-01
 # end_date: 2025-01-10  # optional; if omitted defaults to previous trading day
