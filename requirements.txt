@@ -3,3 +3,4 @@ pandas>=1.5
 numpy>=1.23
 PyYAML>=6.0
 python-dateutil>=2.8.2
+Flask>=2.2

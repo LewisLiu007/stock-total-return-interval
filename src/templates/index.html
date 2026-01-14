@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>A-Share Interval Total Return</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { font-size: 20px; margin-bottom: 10px; }
+    form { background: #f7f7f7; padding: 15px; border-radius: 6px; }
+    label { display: block; margin: 6px 0 4px; font-weight: bold; }
+    input[type="text"] { width: 100%; padding: 8px; box-sizing: border-box; }
+    .row { display: flex; gap: 10px; }
+    .col { flex: 1; }
+    .buttons { margin-top: 10px; display: flex; gap: 10px; }
+    .btn { padding: 8px 12px; border: 1px solid #333; border-radius: 4px; background: #fff; cursor: pointer; }
+    .btn-primary { background: #007bff; color: #fff; border-color: #007bff; }
+    .btn-secondary { background: #6c757d; color: #fff; border-color: #6c757d; }
+    .flash { margin: 10px 0; color: #c00; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { border: 1px solid #ddd; padding: 6px; text-align: center; }
+    th { background: #eee; }
+    .desc { text-align: left; }
+    /* Progress overlay */
+    .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+    .hidden { display: none; }
+    .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; width: 36px; height: 36px; animation: spin 1s linear infinite; margin-right: 10px; }
+    @keyframes spin { 0% { transform: rotate(0deg);} 100% { transform: rotate(360deg);} }
+    .overlay-text { font-size: 16px; color: #333; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div id="overlay" class="overlay hidden">
+    <div class="spinner"></div>
+    <div class="overlay-text">Calculating… Please wait</div>
+  </div>
+  <h1>A-Share Interval Total Return (Unadjusted + Cash Dividends + Bonus/Allotment)</h1>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <div class="flash">
+        {% for msg in messages %}
+          <div>{{ msg }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <form method="post" action="{{ url_for('calculate') }}">
+    <label for="stocks">Stocks (name or 6-digit codes; comma-separated)</label>
+    <input type="text" id="stocks" name="stocks" placeholder="e.g. 贵州茅台, 五粮液, 000568, 洋河股份">
+
+    <div class="row">
+      <div class="col">
+        <label for="start_date">Start Date (YYYY-MM-DD)</label>
+        <input type="text" id="start_date" name="start_date" value="{{ start_date or '' }}" placeholder="2019-01-01">
+      </div>
+      <div class="col">
+        <label for="end_date">End Date (YYYY-MM-DD; empty = previous trading day)</label>
+        <input type="text" id="end_date" name="end_date" value="{{ end_date or '' }}" placeholder="">
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button type="submit" id="calculateBtn" class="btn btn-primary">Calculate</button>
+      <a href="{{ url_for('export') }}" id="exportBtn" class="btn btn-secondary">Export CSV</a>
+    </div>
+  </form>
+
+  {% if rows %}
+    <table>
+      <thead>
+        <tr>
+          <th>name</th>
+          <th>code</th>
+          <th>start_trade_date</th>
+          <th>end_trade_date</th>
+          <th>start_close</th>
+          <th>end_close</th>
+          <th>div_sum_per_share</th>
+          <th>div_event_count</th>
+          <th>additional_shares_per_share</th>
+          <th>additional_event_count</th>
+          <th>additional_value_per_share</th>
+          <th>total_return_pct</th>
+          <th>annualized_return_pct</th>
+          <th class="desc">bonus_allot_desc</th>
+          <th>error</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr>
+            <td>{{ r.name or '' }}</td>
+            <td>{{ r.code or '' }}</td>
+            <td>{{ r.start_trade_date or '' }}</td>
+            <td>{{ r.end_trade_date or '' }}</td>
+            <td>{{ "%.4f"|format(r.start_close) if r.start_close is not none else '' }}</td>
+            <td>{{ "%.4f"|format(r.end_close) if r.end_close is not none else '' }}</td>
+            <td>{{ "%.4f"|format(r.div_sum_per_share) if r.div_sum_per_share is not none else '' }}</td>
+            <td>{{ r.div_event_count if r.div_event_count is not none else '' }}</td>
+            <td>{{ "%.6f"|format(r.additional_shares_per_share) if r.additional_shares_per_share is not none else '' }}</td>
+            <td>{{ r.additional_event_count if r.additional_event_count is not none else '' }}</td>
+            <td>{{ "%.4f"|format(r.additional_value_per_share) if r.additional_value_per_share is not none else '' }}</td>
+            <td>{{ r.total_return_pct or '' }}</td>
+            <td>{{ r.annualized_return_pct or '' }}</td>
+            <td class="desc">{{ r.bonus_allot_desc or '' }}</td>
+            <td>{{ r.error or '' }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</div>
+<script>
+  (function() {
+    const form = document.querySelector('form');
+    const overlay = document.getElementById('overlay');
+    const calcBtn = document.getElementById('calculateBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    if (form) {
+      form.addEventListener('submit', function() {
+        // show overlay and disable buttons
+        if (overlay) overlay.classList.remove('hidden');
+        if (calcBtn) { calcBtn.disabled = true; calcBtn.classList.add('btn-secondary'); }
+        if (exportBtn) { exportBtn.classList.add('disabled'); exportBtn.style.pointerEvents = 'none'; }
+      });
+    }
+    // Ensure overlay is hidden when page is shown (after response)
+    window.addEventListener('pageshow', function() {
+      if (overlay) overlay.classList.add('hidden');
+      if (calcBtn) calcBtn.disabled = false;
+      if (exportBtn) { exportBtn.classList.remove('disabled'); exportBtn.style.pointerEvents = ''; }
+    });
+  })();
+</script>
+</body>
+</html>
