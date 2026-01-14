@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
-    .container { max-width: 1200px; margin: 0 auto; }
+    .container { max-width: 100%; margin: 0; }
     h1 { font-size: 20px; margin-bottom: 10px; }
     form { background: #f7f7f7; padding: 15px; border-radius: 6px; }
     label { display: block; margin: 6px 0 4px; font-weight: bold; }
@@ -18,7 +18,7 @@
     .btn-primary { background: #007bff; color: #fff; border-color: #007bff; }
     .btn-secondary { background: #6c757d; color: #fff; border-color: #6c757d; }
     .flash { margin: 10px 0; color: #c00; }
-    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    table { width: max-content; min-width: 1100px; border-collapse: collapse; margin-top: 15px; }
     th, td { border: 1px solid #ddd; padding: 6px; text-align: center; }
     th { background: #eee; }
     .desc { text-align: left; }
@@ -28,6 +28,9 @@
     .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; width: 36px; height: 36px; animation: spin 1s linear infinite; margin-right: 10px; }
     @keyframes spin { 0% { transform: rotate(0deg);} 100% { transform: rotate(360deg);} }
     .overlay-text { font-size: 16px; color: #333; }
+    /* Prevent page-level horizontal scroll; use table wrapper instead */
+    html, body { overflow-x: hidden; }
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   </style>
 </head>
 <body>
@@ -70,6 +73,7 @@
   </form>
 
   {% if rows %}
+    <div class="table-scroll">
     <table>
       <thead>
         <tr>
@@ -112,6 +116,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
   {% endif %}
 </div>
 <script>
@@ -133,6 +138,12 @@
       if (overlay) overlay.classList.add('hidden');
       if (calcBtn) calcBtn.disabled = false;
       if (exportBtn) { exportBtn.classList.remove('disabled'); exportBtn.style.pointerEvents = ''; }
+      // Reset any horizontal scroll in the results scroller to avoid large left whitespace
+      document.querySelectorAll('.table-scroll').forEach(function(el){ try { el.scrollLeft = 0; } catch(e){} });
+    });
+    // Also ensure reset on DOM ready in case of instant navigation
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('.table-scroll').forEach(function(el){ try { el.scrollLeft = 0; } catch(e){} });
     });
   })();
 </script>
