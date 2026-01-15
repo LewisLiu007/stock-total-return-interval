@@ -6,6 +6,7 @@
 - 命令行 CLI
 
 英文文档请参见: [English README](README_en.md)
+数据接口与用法说明: [DATA_INTERFACES.md](DATA_INTERFACES.md)
 
 ---
 
